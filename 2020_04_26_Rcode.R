@@ -216,12 +216,46 @@ tidy(H1e)
 svyPVglm(DROPOUT ~ INDIG+COHORT+STATE2+GENDER+GRADE+GEO+ACH..PV+ESCS+FLAG_MISS,design = lsay,family = quasibinomial(), placeholder = 1:5)
 h2 <- svyglm(DROPOUT ~ INDIG+COHORT+STATE2+GENDER+GRADE+GEO+ACH1PV+ESCS+FLAG_MISS,design = lsay,family = quasibinomial())
 
-
 ach_h2 <- ggeffects::ggpredict(h2, terms = c("INDIG","ACH1PV [-2,-1.9,-1.8,-1.7,-1.6,-1.5,-1.4,-1.3,-1.2,-1.1,-1,-0.9,-0.8,-0.7,-0.6,-0.5,-0.4,-0.3,-0.2,-0.1,0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2]"))
-ach_h1_out <- data.frame(prob = ach_h1$predicted, ci.low = ach_h1$conf.low, ci.high = ses_h1$conf.high,
-                         indig = rep(c("non-Indigenous","Indigenous"),each=5), ses = rep(-2:2, 2))
+ach_h2_out <- data.frame(prob = ach_h2$predicted, ci.low = ach_h2$conf.low, ci.high = ach_h2$conf.high,
+                         indig = rep(c("non-Indigenous","Indigenous"),each=41), ses = rep(seq(-2,2,.1), 2))
 
 
+
+ach_dist <- ggplot() +
+  geom_density(alpha = .2, aes(x=lsay$variables[lsay$variables$INDIG == 0,"ACH1PV"], fill = "grey", color = "grey", alpha = 0.7)) + 
+  geom_density(alpha = .2, aes(x=lsay$variables[lsay$variables$INDIG == 1,"ACH1PV"], fill = "black", color = "black", alpha = 0.7)) + 
+  theme_stata() + theme(legend.position = "none") + xlab("Achievement Index") + ylab("")  +
+  labs(
+    title = 
+      "<span>Distribution of Achievement for</span>
+    <span style='color:#F8766D;'>Indigenous</span> 
+    and 
+    <span style='color:#00BFC4;'>non-Indigenous</span>
+    </span> youth"
+  ) +
+  theme(
+    plot.title = element_markdown(lineheight = 1.1),
+  )
+
+ach_effect <- ach_h2_out %>%
+  ggplot(aes(x=ses, y=prob, group=indig, color=indig)) +
+  geom_line() + 
+  geom_ribbon(aes(ymin=ci.low,ymax=ci.high, fill=indig), alpha=.2, linetype=0) +
+  theme_stata() + theme(legend.position = "none") + xlab("Achievement Index") + ylab("Probability of not completing high-school")  +
+  labs(
+    title = 
+      "<span>Probability of dropout for equally able</span>
+    <span style='color:#F8766D;'>Indigenous</span> 
+    and 
+    <span style='color:#00BFC4;'>non-Indigenous</span>
+    </span> youth"
+  ) +
+  theme(
+    plot.title = element_markdown(lineheight = 1.1),
+  )
+
+ach_effect /ach_dist
 
 # Model for marginal effects
 # H2 <- svyglm(DROPOUT ~ INDIG*COHORT+STATE2+GENDER+GRADE+GEO+ACH1PV+ESCS+FLAG_MISS,design = lsay,family = quasibinomial())
