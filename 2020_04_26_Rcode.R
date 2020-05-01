@@ -262,14 +262,15 @@ ach_effect /ach_dist
 # ggeffects::ggpredict(H2, terms = c("COHORT","INDIG"))
 
 # Hypothesis 3: Heterogenity in Indigenous Effect ###
-# H3a: Is Indigenous gap the same for high/low achieving Indigenous kids
-svyPVglm(DROPOUT ~ INDIG*ACH..PV+COHORT+ESCS+STATE2+GENDER+GRADE+GEO+FLAG_MISS,design = lsay,family = quasibinomial(), placeholder = 1:5)
+
 #H3b: Is Indigenous gap the same for high/low SES
 svyPVglm(DROPOUT ~ INDIG*ESCS+COHORT+STATE2+GENDER+GRADE+GEO+ACH..PV+FLAG_MISS,design = lsay,family = quasibinomial(), placeholder = 1:5)
 #H3c: Is Indigenous gap the same for urban/Rural
 svyPVglm(DROPOUT ~ INDIG*GEO+COHORT+ESCS+STATE2+GENDER+GRADE+GEO+ACH..PV+FLAG_MISS,design = lsay,family = quasibinomial(), placeholder = 1:5)
 #H3d:Is Indigenous gap the same for boys/girls
 svyPVglm(DROPOUT ~ INDIG*GENDER+COHORT+ESCS+STATE2+GENDER+GRADE+GEO+ACH..PV+FLAG_MISS,design = lsay,family = quasibinomial(), placeholder = 1:5)
+# H3a: Is Indigenous gap the same for high/low achieving Indigenous kids
+svyPVglm(DROPOUT ~ INDIG*ACH..PV+COHORT+ESCS+STATE2+GENDER+GRADE+GEO+FLAG_MISS,design = lsay,family = quasibinomial(), placeholder = 1:5)
 #H3f:Does the Indigenous gap respond to changes in legislation
 svyPVglm(DROPOUT ~ INDIG*COHORT+SC+GENDER+ESCS+STATE2+GENDER+GRADE+GEO+ACH..PV+FLAG_MISS,design = lsay,family = quasibinomial(), placeholder = 1:5)
 
@@ -278,19 +279,65 @@ svyPVglm(DROPOUT ~ INDIG*ACH..PV+INDIG*ESCS+INDIG*GEO+INDIG*COHORT+INDIG*GENDER+
 
 
 # To get Marginal Effects
-H3a <- svyglm(DROPOUT ~ INDIG*ACH1PV+ESCS+COHORT+STATE2+GENDER+GRADE+GEO+ACH1PV+SC+FLAG_MISS,design = lsay,family = quasibinomial())
-ggeffects::ggpredict(H3a, terms = c("INDIG", "ACH1PV [-2,-1,0,1,2]"))
-
-H3b <- svyglm(DROPOUT ~ INDIG*ESCS+COHORT+STATE2+GENDER+GRADE+GEO+ACH1PV+SC+FLAG_MISS,design = lsay,family = quasibinomial())
-ggeffects::ggpredict(H3b, terms = c("INDIG", "ESCS [-2,-1,0,1,2]"))
-
-H3c <- svyglm(DROPOUT ~ INDIG*GEO+ESCS+COHORT+STATE2+GENDER+GRADE+GEO+ACH1PV+SC+FLAG_MISS,design = lsay,family = quasibinomial())
-ggeffects::ggpredict(H3c, terms = c("INDIG", "GEO"))
-
-# Only significant in model with 1 interaction at a time
-H3c <- svyglm(DROPOUT ~ INDIG*GENDER+ESCS+COHORT+STATE2+GENDER+GRADE+GEO+ACH1PV+SC+FLAG_MISS,design = lsay,family = quasibinomial())
-ggeffects::ggpredict(H3c, terms = c("INDIG", "GENDER"))
-H3c <- svyglm(DROPOUT ~ INDIG*GEO+ESCS+COHORT+STATE2+GENDER+GRADE+GEO+ACH1PV+SC+FLAG_MISS,design = lsay,family = quasibinomial())
-ggeffects::ggpredict(H3c, terms = c("INDIG", "GEO"))
 
 
+H3a <- svyglm(DROPOUT ~ INDIG*ESCS+COHORT+STATE2+GENDER+GRADE+GEO+ACH1PV+SC+FLAG_MISS,design = lsay,family = quasibinomial())
+ses_h3 <- ggeffects::ggpredict(H3a, terms = c("INDIG", "ESCS [-2,-1.9,-1.8,-1.7,-1.6,-1.5,-1.4,-1.3,-1.2,-1.1,-1,-0.9,-0.8,-0.7,-0.6,-0.5,-0.4,-0.3,-0.2,-0.1,0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2]"))
+ses_h3_out <- data.frame(prob = ses_h3$predicted, ci.low = ses_h3$conf.low, ci.high = ses_h3$conf.high,
+                         indig = rep(c("non-Indigenous","Indigenous"),each=41), ses = rep(seq(-2,2,.1), 2))
+
+ses_effect_h3 <- ses_h3_out %>%
+  ggplot(aes(x=ses, y=prob, group=indig, color=indig)) +
+  geom_line() + 
+  geom_ribbon(aes(ymin=ci.low,ymax=ci.high, fill=indig), alpha=.2, linetype=0) +
+  theme_stata() + theme(legend.position = "none") + xlab("Socioeconomic Status") + ylab("Probability of not completing high-school")  +
+  labs(
+    title = 
+      "<span>Probability of dropout for </span>
+    <span style='color:#F8766D;'>Indigenous</span> 
+    and 
+    <span style='color:#00BFC4;'>non-Indigenous</span>
+    </span> youth"
+  ) +
+  theme(
+    plot.title = element_markdown(lineheight = 1.1),
+  )
+
+H3b <- svyglm(DROPOUT ~ INDIG*GEO+ESCS+COHORT+STATE2+GENDER+GRADE+GEO+ACH1PV+SC+FLAG_MISS,design = lsay,family = quasibinomial())
+geo_h3 <- ggeffects::ggpredict(H3b, terms = c("INDIG", "GEO"))
+geo_h3_out <- data.frame(prob = geo_h3$predicted, ci.low = geo_h3$conf.low, ci.high = geo_h3$conf.high,
+                         indig = rep(c("non-Indigenous","Indigenous"),each=2), geo = rep(c("Provincial/Rural","Urban"), 2))
+geo_plot_h3 <- geo_h3_out %>%
+  ggplot(aes(x=geo, y=prob, ymin=ci.low, ymax=ci.high)) +
+  geom_pointrange() + 
+  #geom_hline(yintercept=0, lty=2) +  # add a dotted line at x=1 after flip
+  coord_flip() +  # flip coordinates (puts labels on y axis)
+  xlab("Indigenous") + ylab("Probability") +
+  facet_wrap(~indig) +
+  theme_stata() + xlab("") + ylab("Probability of not completing high-school") +
+  ggtitle("Geography by Indigenous Status")
+
+
+H3c <- svyglm(DROPOUT ~ INDIG*ACH1PV+ESCS+COHORT+STATE2+GENDER+GRADE+GEO+ACH1PV+SC+FLAG_MISS,design = lsay,family = quasibinomial())
+ach_h3 <- ggeffects::ggpredict(H3c, terms = c("INDIG", "ACH1PV [-2,-1.9,-1.8,-1.7,-1.6,-1.5,-1.4,-1.3,-1.2,-1.1,-1,-0.9,-0.8,-0.7,-0.6,-0.5,-0.4,-0.3,-0.2,-0.1,0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2]"))
+ach_h3_out <- data.frame(prob = ach_h3$predicted, ci.low = ach_h3$conf.low, ci.high = ach_h3$conf.high,
+                         indig = rep(c("non-Indigenous","Indigenous"),each=41), ses = rep(seq(-2,2,.1), 2))
+ach_effect_h3 <- ach_h3_out %>%
+  ggplot(aes(x=ses, y=prob, group=indig, color=indig)) +
+  geom_line() + 
+  geom_ribbon(aes(ymin=ci.low,ymax=ci.high, fill=indig), alpha=.2, linetype=0) +
+  theme_stata() + theme(legend.position = "none") + xlab("Achievement Index") + ylab("Probability of not completing high-school")  +
+  labs(
+    title = 
+      "<span>Probability of dropout for </span>
+    <span style='color:#F8766D;'>Indigenous</span> 
+    and 
+    <span style='color:#00BFC4;'>non-Indigenous</span>
+    </span> youth"
+  ) +
+  theme(
+    plot.title = element_markdown(lineheight = 1.1),
+  )
+
+ach_effect_h3 + ses_effect_h3 +plot_layout(ncol=1)
+geo_plot_h3
