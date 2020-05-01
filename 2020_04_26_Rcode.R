@@ -6,6 +6,7 @@ library(Hmisc)
 library(psych)
 library(apaTables)
 library(tidyverse)
+library(ggtext)
 library(ggeffects)
 library(magrittr)
 library(broom)
@@ -32,7 +33,7 @@ sjlabelled::get_labels(lsay2009$ST04Q01)
 lsay2003short <- lsay2003 %>%
   setNames(toupper(names(.)))%>%
   filter(!is.na(WT2004) ) %>% #Not sure wether to use 2004 weights or 2007
-  select(WT2 = WT2007, starts_with("PV"), INDIG, GENDER = sex, GEO = LOC,
+  select(WT2 = WT2007, starts_with("PV"), INDIG, GENDER = SEX, GEO = LOC,
          SCH10 = LBWDV01, SCH11 = LCWDV01, SCH12 = LDWDV01, SCH13 = LEWDV01,
          STATEID, GRADE = ST01Q01,
          SC = LAA027, WT = WT2004, ESCS, starts_with("W_FSTR")) %>%
@@ -163,7 +164,9 @@ geo_plot <- geo_h1_out %>%
   coord_flip() +  # flip coordinates (puts labels on y axis)
   xlab("Indigenous") + ylab("Probability") +
   facet_wrap(~indig) +
-  theme_stata()
+  theme_stata() + xlab("") + ylab("Probability of not completing high-school") +
+  ggtitle("Geography by Indigenous Status")
+
 # Is the gap the same for Rich and poor and rural
 H1d <- svyglm(DROPOUT ~ INDIG*ESCS+COHORT+GRADE+STATE2+GEO+GENDER+FLAG_MISS+ESCS,design = lsay,family = quasibinomial())
 # Tidy Output
@@ -173,10 +176,24 @@ ses_h1_out <- data.frame(prob = ses_h1$predicted, ci.low = ses_h1$conf.low, ci.h
                          indig = rep(c("non-Indigenous","Indigenous"),each=5), ses = rep(-2:2, 2))
 
 
+library(ggtext)
+
+
 ses_dist <- ggplot() +
   geom_density(alpha = .2, aes(x=lsay$variables[lsay$variables$INDIG == 0,"ESCS"], fill = "grey", color = "grey", alpha = 0.7)) + 
   geom_density(alpha = .2, aes(x=lsay$variables[lsay$variables$INDIG == 1,"ESCS"], fill = "black", color = "black", alpha = 0.7)) + 
-  theme_stata() + theme(legend.position = "none")
+  theme_stata() + theme(legend.position = "none") + xlab("Socioeconomic status") + ylab("")  +
+  labs(
+    title = 
+    "<span>Distribution of Socioeconomic Status for</span>
+    <span style='color:#F8766D;'>Indigenous</span> 
+    and 
+    <span style='color:#00BFC4;'>non-Indigenous</span>
+    </span> Youth"
+  ) +
+  theme(
+    plot.title = element_markdown(lineheight = 1.1),
+  )
 
 ses_plot <- ses_h1_out %>%
   ggplot(aes(x=ses, y=prob, ymin=ci.low, ymax=ci.high)) +
@@ -185,7 +202,8 @@ ses_plot <- ses_h1_out %>%
   coord_flip() +  # flip coordinates (puts labels on y axis)
   xlab("Indigenous") + ylab("Probability") +
   facet_wrap(~indig) +
-  theme_stata()
+  theme_stata() + xlab("Socioeconomic Status") + ylab("Probability of not completing high-school") +
+  ggtitle("Socioeconomic Status by Indigenous Status")
 
 ses_dist + {geo_plot + ses_plot + plot_layout(ncol=2)} + plot_layout(ncol=1)
 
@@ -202,6 +220,8 @@ h2 <- svyglm(DROPOUT ~ INDIG+COHORT+STATE2+GENDER+GRADE+GEO+ACH1PV+ESCS+FLAG_MIS
 ach_h2 <- ggeffects::ggpredict(h2, terms = c("INDIG","ACH1PV [-2,-1.9,-1.8,-1.7,-1.6,-1.5,-1.4,-1.3,-1.2,-1.1,-1,-0.9,-0.8,-0.7,-0.6,-0.5,-0.4,-0.3,-0.2,-0.1,0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2]"))
 ach_h1_out <- data.frame(prob = ach_h1$predicted, ci.low = ach_h1$conf.low, ci.high = ses_h1$conf.high,
                          indig = rep(c("non-Indigenous","Indigenous"),each=5), ses = rep(-2:2, 2))
+
+
 
 # Model for marginal effects
 # H2 <- svyglm(DROPOUT ~ INDIG*COHORT+STATE2+GENDER+GRADE+GEO+ACH1PV+ESCS+FLAG_MISS,design = lsay,family = quasibinomial())
