@@ -26,11 +26,13 @@ get_labels(lsay2003$loc)
 lsay2009<- readit::readit("~/cloudstor/Databases/2020-03-12_LSAY/LSAY_2009.dta")
 lsay2003<- readit::readit("~/cloudstor/Databases/LSAY_DATSETS/LSAY2003_2016.sav")
 
+sjlabelled::get_labels(lsay2003$sex)
+sjlabelled::get_labels(lsay2009$ST04Q01)
 # 2003 
 lsay2003short <- lsay2003 %>%
   setNames(toupper(names(.)))%>%
   filter(!is.na(WT2004) ) %>% #Not sure wether to use 2004 weights or 2007
-  select(WT2 = WT2007, starts_with("PV"), INDIG, GENDER = ST04Q01, GEO = LOC,
+  select(WT2 = WT2007, starts_with("PV"), INDIG, GENDER = sex, GEO = LOC,
          SCH10 = LBWDV01, SCH11 = LCWDV01, SCH12 = LDWDV01, SCH13 = LEWDV01,
          STATEID, GRADE = ST01Q01,
          SC = LAA027, WT = WT2004, ESCS, starts_with("W_FSTR")) %>%
