@@ -211,6 +211,11 @@ ses_dist + {geo_plot + ses_plot + plot_layout(ncol=2)} + plot_layout(ncol=1)
 H1e <- svyglm(DROPOUT ~ INDIG*ESCS+INDIG*GEO+INDIG*GENDER+COHORT+GRADE+STATE2+GEO+GENDER+FLAG_MISS+ESCS,design = lsay,family = quasibinomial())
 tidy(H1e)
 
+# Has the gap closed
+H1f <- svyglm(DROPOUT ~ INDIG*COHORT+ESCS+COHORT+GRADE+STATE2+GEO+GENDER+FLAG_MISS+ESCS,design = lsay,family = quasibinomial())
+# Tidy Output
+tidy(H1f)
+
 # Hypothesis 2 ####
 # H2b: Indigenous disadvantage still present when comparing equally advantaged and equally achieving Indigenous and non-Indigenous Youth
 svyPVglm(DROPOUT ~ INDIG+COHORT+STATE2+GENDER+GRADE+GEO+ACH..PV+ESCS+FLAG_MISS,design = lsay,family = quasibinomial(), placeholder = 1:5)
