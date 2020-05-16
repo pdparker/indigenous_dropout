@@ -19,8 +19,8 @@ library(lme4)
 library(patchwork)
 library(ggthemes)
 # Tips and Tricks: Don't Run ####
-get_label(lsay2003$loc)
-get_labels(lsay2003$loc)
+#get_label(lsay2003$loc)
+#get_labels(lsay2003$loc)
 
 # Data Prep ####
 # Change here
@@ -132,9 +132,30 @@ lsay %>% mutate(sample_size = is.na(WT2)) %>% group_by(COHORT, sample_size) %>% 
 # Using old school survey package here in order for ggeffects to work
 lsay <- svrepdesign(data=lsay, weights=~WT, repweights = "W_FSTR[1-9]+", type="Fay", rho = .5, )
 # Descriptives ####
-svytable(~INDIG+COHORT, lsay)
 svyby(~ACH1PV, ~INDIG,lsay,FUN = svymean)
 svyby(~ACH1PV, ~INDIG,lsay,FUN = svyvar)^.5
+# Descriptives
+descriptive <- matrix(NA, ncol = 3, nrow = 8)
+dropout <- svytable(~INDIG+DROPOUT, design=lsay) %>% prop.table(., margin = 1)*100 
+cohort <- svytable(~INDIG+COHORT, lsay) %>% prop.table(., margin = 2)*100 
+gender <- svytable(~INDIG+GENDER, lsay) %>% prop.table(., margin = 1)*100 
+urban <- svytable(~INDIG+GEO, lsay) %>% prop.table(., margin = 1)*100 
+grade <- svytable(~INDIG+I(GRADE>=10), lsay) %>% prop.table(., margin = 1)*100 
+achievement <- svyby(~ACH1PV, ~INDIG,design = lsay,FUN = svymean, vartype = "ci")
+ses <- svyby(~ESCS, ~INDIG,design = lsay,FUN = svymean, na.rm=TRUE, vartype = "ci")
+
+
+descriptive[1,] <- c("Dropout %", sprintf("%.2f%%",dropout[2,1]), sprintf("%.2f%%",dropout[2,2]) )
+descriptive[2,] <- c("Cohort 2003", sprintf("%.2f%%",cohort[1,1]), sprintf("%.2f%%",cohort[2,1]) )
+descriptive[3,] <- c("Cohort 2003", sprintf("%.2f%%",cohort[1,2]), sprintf("%.2f%%",cohort[2,2]) )
+descriptive[4,] <- c("Girls %", sprintf("%.2f%%",gender[1,1]), sprintf("%.2f%%",gender[2,1]) )
+descriptive[5,] <- c("Urban %", sprintf("%.2f%%",urban[2,1]), sprintf("%.2f%%",urban[2,2]) )
+descriptive[6,] <- c("Year 10 or Higher %", sprintf("%.2f%%",grade[1,1]), sprintf("%.2f%%",grade[2,2]) )
+descriptive[7,] <- c("Achievement Index", sprintf("%.2f [%.2f, %.2f]",achievement[1,2],achievement[1,3],achievement[1,4]), sprintf("%.2f [%.2f, %.2f]",achievement[2,2],achievement[2,3],achievement[2,4]) )
+descriptive[8,] <- c("Socioeconomic Status Index", sprintf("%.2f [%.2f, %.2f]",ses[1,2],ses[1,3],ses[1,4]), sprintf("%.2f [%.2f, %.2f]",ses[2,2],ses[2,3],ses[2,4]) )
+colnames(descriptive) <- c("Variable", "non-Indigenous", "Indigenous")
+
+flextable::flextable()
 # Models ####
 # Hypothesis 1 ####
 # H1a: Indigenous Australian Children have higher dropout rates
