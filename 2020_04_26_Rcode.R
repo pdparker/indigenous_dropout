@@ -218,7 +218,31 @@ tidy(H1f)
 
 # Hypothesis 2 ####
 # H2b: Indigenous disadvantage still present when comparing equally advantaged and equally achieving Indigenous and non-Indigenous Youth
-svyPVglm(DROPOUT ~ INDIG+COHORT+STATE2+GENDER+GRADE+GEO+ACH..PV+ESCS+FLAG_MISS,design = lsay,family = quasibinomial(), placeholder = 1:5)
+nms <- data_frame(orig = c("(Intercept)","INDIG", "COHORT2","STATE2", "GENDER","GRADE","GEO","ACH1PV","ESCS","FLAG_MISS"),
+                  dest = c("Intercept", "Indigenous status", "Cohort (2009)", "Region (East Coast)", "Gender (boys)","Grade", "Place (Urban)", 
+                           "Achievement index", "Socioeconomic status", "Missing flag"))
+# 
+tmp1 <- svyPVglm(DROPOUT ~ INDIG+COHORT+STATE2+GENDER+GRADE+GEO+ACH..PV+ESCS+FLAG_MISS,design = lsay,family = quasibinomial(), placeholder = 1:5)
+
+tmp1$coef %>% 
+  rownames_to_column(var = "Parameter") %>%
+  as_tibble() %>%
+  mutate(conf.low = mean - 2*se,
+         conf.high = mean + 2*se) %>%
+  mutate_if(is.numeric, .funs = ~round(., 3)) %>%
+  mutate(p = as.numeric(Pr.t),
+         p = case_when(
+           p < .001 ~ "< .001",
+           p >= .001 ~ as.character(round(p,3)),
+           TRUE ~ "< .001"
+         )
+  ) %>%
+  select(Parameter, Est = mean, `-95% CI` = conf.low, `+95% CI` = conf.high, p) %>%
+  left_join(., nms, by = c(Parameter = "orig")) %>%
+  select(Predictor = dest, everything()) %>% select(-Parameter)
+  
+
+
 h2 <- svyglm(DROPOUT ~ INDIG+COHORT+STATE2+GENDER+GRADE+GEO+ACH1PV+ESCS+FLAG_MISS,design = lsay,family = quasibinomial())
 
 ach_h2 <- ggeffects::ggpredict(h2, terms = c("INDIG","ACH1PV [-2,-1.9,-1.8,-1.7,-1.6,-1.5,-1.4,-1.3,-1.2,-1.1,-1,-0.9,-0.8,-0.7,-0.6,-0.5,-0.4,-0.3,-0.2,-0.1,0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2]"))
