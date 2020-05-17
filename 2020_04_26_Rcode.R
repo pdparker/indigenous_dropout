@@ -18,6 +18,8 @@ library(survey)
 library(lme4)
 library(patchwork)
 library(ggthemes)
+library(flextable)
+library(officer)
 # Tips and Tricks: Don't Run ####
 #get_label(lsay2003$loc)
 #get_labels(lsay2003$loc)
@@ -151,11 +153,18 @@ descriptive[3,] <- c("Cohort 2003", sprintf("%.2f%%",cohort[1,2]), sprintf("%.2f
 descriptive[4,] <- c("Girls %", sprintf("%.2f%%",gender[1,1]), sprintf("%.2f%%",gender[2,1]) )
 descriptive[5,] <- c("Urban %", sprintf("%.2f%%",urban[2,1]), sprintf("%.2f%%",urban[2,2]) )
 descriptive[6,] <- c("Year 10 or Higher %", sprintf("%.2f%%",grade[1,1]), sprintf("%.2f%%",grade[2,2]) )
-descriptive[7,] <- c("Achievement Index", sprintf("%.2f [%.2f, %.2f]",achievement[1,2],achievement[1,3],achievement[1,4]), sprintf("%.2f [%.2f, %.2f]",achievement[2,2],achievement[2,3],achievement[2,4]) )
-descriptive[8,] <- c("Socioeconomic Status Index", sprintf("%.2f [%.2f, %.2f]",ses[1,2],ses[1,3],ses[1,4]), sprintf("%.2f [%.2f, %.2f]",ses[2,2],ses[2,3],ses[2,4]) )
-colnames(descriptive) <- c("Variable", "non-Indigenous", "Indigenous")
+descriptive[7,] <- c("Achievement Index (Mean)", sprintf("%.2f [%.2f, %.2f]",achievement[1,2],achievement[1,3],achievement[1,4]), sprintf("%.2f [%.2f, %.2f]",achievement[2,2],achievement[2,3],achievement[2,4]) )
+descriptive[8,] <- c("Socioeconomic Status Index (Mean)", sprintf("%.2f [%.2f, %.2f]",ses[1,2],ses[1,3],ses[1,4]), sprintf("%.2f [%.2f, %.2f]",ses[2,2],ses[2,3],ses[2,4]) )
+descriptive <- data.frame(descriptive)
+names(descriptive) <- c("Variable", "non-Indigenous", "Indigenous")
 
-flextable::flextable()
+flextable(descriptive) %>%
+  hline_bottom(x=.,part="header", border = fp_border(width=1)) %>%
+  hline_top(x=.,part="header", border = fp_border(width=2)) %>%
+  autofit() %>%
+  align(align = "left", part = "all") %>%
+  save_as_image(path = "img/descriptives.png")
+
 # Models ####
 # Hypothesis 1 ####
 # H1a: Indigenous Australian Children have higher dropout rates
