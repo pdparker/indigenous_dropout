@@ -20,6 +20,8 @@ library(patchwork)
 library(ggthemes)
 library(flextable)
 library(officer)
+library(oxbase)
+library(sparkline)
 # Tips and Tricks: Don't Run ####
 #get_label(lsay2003$loc)
 #get_labels(lsay2003$loc)
@@ -28,6 +30,7 @@ library(officer)
 # Change here
 lsay2009<- readit::readit("~/cloudstor/Databases/2020-03-12_LSAY/LSAY_2009.dta")
 lsay2003<- readit::readit("~/cloudstor/Databases/LSAY_DATSETS/LSAY2003_2016.sav")
+meta <- read_csv("names_metadata.csv")
 
 sjlabelled::get_labels(lsay2003$sex)
 sjlabelled::get_labels(lsay2009$ST04Q01)
@@ -146,12 +149,11 @@ grade <- svytable(~INDIG+I(GRADE>=10), lsay) %>% prop.table(., margin = 1)*100
 achievement <- svyby(~ACH1PV, ~INDIG,design = lsay,FUN = svymean, vartype = "ci")
 ses <- svyby(~ESCS, ~INDIG,design = lsay,FUN = svymean, na.rm=TRUE, vartype = "ci")
 
-
-descriptive[1,] <- c("Dropout %", sprintf("%.2f%%",dropout[2,1]), sprintf("%.2f%%",dropout[2,2]) )
-descriptive[2,] <- c("Cohort 2003", sprintf("%.2f%%",cohort[1,1]), sprintf("%.2f%%",cohort[2,1]) )
-descriptive[3,] <- c("Cohort 2003", sprintf("%.2f%%",cohort[1,2]), sprintf("%.2f%%",cohort[2,2]) )
-descriptive[4,] <- c("Girls %", sprintf("%.2f%%",gender[1,1]), sprintf("%.2f%%",gender[2,1]) )
-descriptive[5,] <- c("Urban %", sprintf("%.2f%%",urban[2,1]), sprintf("%.2f%%",urban[2,2]) )
+descriptive[1,] <- c("Dropout %", sprintf("%.2f%%",dropout[2,1]), sprintf("%.2f%%",dropout[2,2]))
+descriptive[2,] <- c("Cohort 2003", sprintf("%.2f%%",cohort[1,1]), sprintf("%.2f%%",cohort[2,1]))
+descriptive[3,] <- c("Cohort 2003", sprintf("%.2f%%",cohort[1,2]), sprintf("%.2f%%",cohort[2,2]))
+descriptive[4,] <- c("Girls %", sprintf("%.2f%%",gender[1,1]), sprintf("%.2f%%",gender[2,1]))
+descriptive[5,] <- c("Urban %", sprintf("%.2f%%",urban[2,1]), sprintf("%.2f%%",urban[2,2]))
 descriptive[6,] <- c("Year 10 or Higher %", sprintf("%.2f%%",grade[1,1]), sprintf("%.2f%%",grade[2,2]) )
 descriptive[7,] <- c("Achievement Index (Mean)", sprintf("%.2f [%.2f, %.2f]",achievement[1,2],achievement[1,3],achievement[1,4]), sprintf("%.2f [%.2f, %.2f]",achievement[2,2],achievement[2,3],achievement[2,4]) )
 descriptive[8,] <- c("Socioeconomic Status Index (Mean)", sprintf("%.2f [%.2f, %.2f]",ses[1,2],ses[1,3],ses[1,4]), sprintf("%.2f [%.2f, %.2f]",ses[2,2],ses[2,3],ses[2,4]) )
@@ -163,24 +165,28 @@ flextable(descriptive) %>%
   hline_top(x=.,part="header", border = fp_border(width=2)) %>%
   autofit() %>%
   align(align = "left", part = "all") %>%
+  footnote(i = 7:8, j = 1,
+           value = as_paragraph("95% confidence intervals in square brackets"),
+           ref_symbols = c("a")) %>%
+  set_caption(caption = "Table 1. Descriptives") %>%
   save_as_image(path = "img/descriptives.png")
 
 # Models ####
 # Hypothesis 1 ####
 # H1a: Indigenous Australian Children have higher dropout rates
-H1 <- svyglm(DROPOUT ~ INDIG+COHORT+GRADE+STATE2+GEO+GENDER+FLAG_MISS+ESCS,design = lsay,family = quasibinomial())
+H1 <- svyglm(DROPOUT ~ INDIG+COHORT+GRADE+GEO+GENDER+FLAG_MISS+ESCS,design = lsay,family = quasibinomial())
 # Tidy Output
-tidy(H1)
+H1_out <- tidy(H1, conf.int=TRUE)
 #Marginal Effects H1b
 ggeffects::ggpredict(H1, terms = c("INDIG"))
 # Is the gap the same for boys and girls
-H1b <- svyglm(DROPOUT ~ INDIG*GENDER+COHORT+GRADE+STATE2+GEO+GENDER+FLAG_MISS+ESCS,design = lsay,family = quasibinomial())
+H1b <- svyglm(DROPOUT ~ INDIG*GENDER+COHORT+GRADE+GEO+GENDER+FLAG_MISS+ESCS,design = lsay,family = quasibinomial())
 # Tidy Output
-tidy(H1b)
+H1b_out <- tidy(H1b, conf.int=TRUE)
 # Is the gap the same for urban and rural
-H1c <- svyglm(DROPOUT ~ INDIG*GEO+COHORT+GRADE+STATE2+GEO+GENDER+FLAG_MISS+ESCS,design = lsay,family = quasibinomial())
+H1c <- svyglm(DROPOUT ~ INDIG*GEO+COHORT+GRADE+GEO+GENDER+FLAG_MISS+ESCS,design = lsay,family = quasibinomial())
 # Tidy Output
-tidy(H1c)
+H1c_out <- tidy(H1c, conf.int=TRUE)
 #Marginal Effects H1b
 geo_h1 <- ggeffects::ggpredict(H1b, terms = c("INDIG","GEO"))
 
@@ -198,9 +204,9 @@ geo_plot <- geo_h1_out %>%
   ggtitle("Geography by Indigenous Status")
 
 # Is the gap the same for Rich and poor and rural
-H1d <- svyglm(DROPOUT ~ INDIG*ESCS+COHORT+GRADE+STATE2+GEO+GENDER+FLAG_MISS+ESCS,design = lsay,family = quasibinomial())
+H1d <- svyglm(DROPOUT ~ INDIG*ESCS+COHORT+GRADE+GEO+GENDER+FLAG_MISS+ESCS,design = lsay,family = quasibinomial())
 # Tidy Output
-tidy(H1d)
+H1d_out <- tidy(H1d, conf.int=TRUE)
 ses_h1 <- ggeffects::ggpredict(H1d, terms = c("INDIG","ESCS [-2,-1,0,1,2]"))
 ses_h1_out <- data.frame(prob = ses_h1$predicted, ci.low = ses_h1$conf.low, ci.high = ses_h1$conf.high,
                          indig = rep(c("non-Indigenous","Indigenous"),each=5), ses = rep(-2:2, 2))
@@ -238,48 +244,64 @@ ses_plot <- ses_h1_out %>%
 ses_dist + {geo_plot + ses_plot + plot_layout(ncol=2)} + plot_layout(ncol=1)
 
 
-H1e <- svyglm(DROPOUT ~ INDIG*ESCS+INDIG*GEO+INDIG*GENDER+COHORT+GRADE+STATE2+GEO+GENDER+FLAG_MISS+ESCS,design = lsay,family = quasibinomial())
-tidy(H1e)
+H1e <- svyglm(DROPOUT ~ INDIG*ESCS+INDIG*GEO+INDIG*GENDER+INDIG*COHORT+GRADE+GEO+GENDER+FLAG_MISS+ESCS,design = lsay,family = quasibinomial())
+H1e_out <- tidy(H1e, conf.int=TRUE)
 
 # Has the gap closed
-H1f <- svyglm(DROPOUT ~ INDIG*COHORT+ESCS+COHORT+GRADE+STATE2+GEO+GENDER+FLAG_MISS+ESCS,design = lsay,family = quasibinomial())
+H1f <- svyglm(DROPOUT ~ INDIG*COHORT+ESCS+COHORT+GRADE+GEO+GENDER+FLAG_MISS+ESCS,design = lsay,family = quasibinomial())
 # Tidy Output
-tidy(H1f)
+H1f_out <- tidy(H1f, conf.int=TRUE)
 
+hypothesis_1 <- matrix(NA, ncol=3, nrow=5)
+
+hypothesis_1[1,] <- c("Main Indigenous effect",sprintf("%.2f [%.2f, %.2f] p = %.3f", H1_out$estimate[2],H1_out$conf.low[2],H1_out$conf.high[2],H1_out$p.value[2])," ")
+hypothesis_1[2,] <- c("Indigenous by gender",sprintf("%.2f [%.2f, %.2f] p = %.3f", H1b_out$estimate[9],H1b_out$conf.low[9],H1b_out$conf.high[9],H1b_out$p.value[9]),
+                      sprintf("%.2f [%.2f, %.2f] p = %.3f", H1e_out$estimate[11],H1e_out$conf.low[11],H1e_out$conf.high[11],H1e_out$p.value[11]))
+hypothesis_1[3,] <- c("Indigenous by urban",sprintf("%.2f [%.2f, %.2f] p = %.3f", H1c_out$estimate[9],H1c_out$conf.low[9],H1c_out$conf.high[9],H1c_out$p.value[9]),
+                      sprintf("%.2f [%.2f, %.2f] p = %.3f", H1e_out$estimate[10],H1e_out$conf.low[10],H1e_out$conf.high[10],H1e_out$p.value[10]))
+hypothesis_1[4,] <- c("Indigenous by socioeconomic status",sprintf("%.2f [%.2f, %.2f] p = %.3f", H1d_out$estimate[9],H1d_out$conf.low[9],H1d_out$conf.high[9],H1d_out$p.value[9]),
+                      sprintf("%.2f [%.2f, %.2f] p = %.3f", H1e_out$estimate[9],H1e_out$conf.low[9],H1e_out$conf.high[9],H1e_out$p.value[9]))
+hypothesis_1[5,] <- c("Indigenous by cohort",sprintf("%.2f [%.2f, %.2f] p = %.3f", H1f_out$estimate[9],H1f_out$conf.low[9],H1f_out$conf.high[9],H1f_out$p.value[9]),
+                      sprintf("%.2f [%.2f, %.2f] p = %.3f", H1e_out$estimate[12],H1e_out$conf.low[12],H1e_out$conf.high[12],H1e_out$p.value[12]))
+
+hypothesis_1 <- data.frame(hypothesis_1)
+names(hypothesis_1) <- c("Log-odds", "Univariate", "Multivariate")
+
+flextable(hypothesis_1) %>%
+  hline_bottom(x=.,part="header", border = fp_border(width=1)) %>%
+  hline_top(x=.,part="header", border = fp_border(width=2)) %>%
+  autofit() %>%
+  align(align = "left", part = "all") %>%
+  footnote(i = c(1), j = 2:3, part = "header",
+           value = as_paragraph(c("Interaction when entered one at a time",
+                                "Interactions when all interactions entered into the model")
+           ),
+           ref_symbols = c("a", "b")) %>%
+  color(i = c(2,5),
+        j = 2,
+        color="grey") %>%
+  color(i = c(2,3),
+        j = 3,
+        color="grey") %>%
+  set_caption("Table 2. Hypothesis 1 Results") %>%
+  save_as_image(path = "img/hypothesis1.png")
 # Hypothesis 2 ####
 # H2b: Indigenous disadvantage still present when comparing equally advantaged and equally achieving Indigenous and non-Indigenous Youth
-nms <- data_frame(orig = c("(Intercept)","INDIG", "COHORT2","STATE2", "GENDER","GRADE","GEO","ACH1PV","ESCS","FLAG_MISS"),
-                  dest = c("Intercept", "Indigenous status", "Cohort (2009)", "Region (East Coast)", "Gender (boys)","Grade", "Place (Urban)", 
-                           "Achievement index", "Socioeconomic status", "Missing flag"))
-# 
-tmp1 <- svyPVglm(DROPOUT ~ INDIG+COHORT+STATE2+GENDER+GRADE+GEO+ACH..PV+ESCS+FLAG_MISS,design = lsay,family = quasibinomial(), placeholder = 1:5)
+H2 <- svyPVglm(DROPOUT ~ INDIG+COHORT+GENDER+GRADE+GEO+ACH..PV+ESCS+FLAG_MISS,design = lsay,family = quasibinomial(), placeholder = 1:5)
 
-tmp1$coef %>% 
+H2_out <- H2$coef %>% 
   rownames_to_column(var = "Parameter") %>%
   as_tibble() %>%
   mutate(conf.low = mean - 2*se,
-         conf.high = mean + 2*se) %>%
-  mutate_if(is.numeric, .funs = ~round(., 3)) %>%
-  mutate(p = as.numeric(Pr.t),
-         p = case_when(
-           p < .001 ~ "< .001",
-           p >= .001 ~ as.character(round(p,3)),
-           TRUE ~ "< .001"
-         )
-  ) %>%
-  select(Parameter, Est = mean, `-95% CI` = conf.low, `+95% CI` = conf.high, p) %>%
-  left_join(., nms, by = c(Parameter = "orig")) %>%
-  select(Predictor = dest, everything()) %>% select(-Parameter)
+         conf.high = mean + 2*se)
   
 
 
-h2 <- svyglm(DROPOUT ~ INDIG+COHORT+STATE2+GENDER+GRADE+GEO+ACH1PV+ESCS+FLAG_MISS,design = lsay,family = quasibinomial())
+h2 <- svyglm(DROPOUT ~ INDIG+COHORT+GENDER+GRADE+GEO+ACH1PV+ESCS+FLAG_MISS,design = lsay,family = quasibinomial())
 
 ach_h2 <- ggeffects::ggpredict(h2, terms = c("INDIG","ACH1PV [-2,-1.9,-1.8,-1.7,-1.6,-1.5,-1.4,-1.3,-1.2,-1.1,-1,-0.9,-0.8,-0.7,-0.6,-0.5,-0.4,-0.3,-0.2,-0.1,0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2]"))
 ach_h2_out <- data.frame(prob = ach_h2$predicted, ci.low = ach_h2$conf.low, ci.high = ach_h2$conf.high,
                          indig = rep(c("non-Indigenous","Indigenous"),each=41), ses = rep(seq(-2,2,.1), 2))
-
-
 
 ach_dist <- ggplot() +
   geom_density(alpha = .2, aes(x=lsay$variables[lsay$variables$INDIG == 0,"ACH1PV"], fill = "grey", color = "grey", alpha = 0.7)) + 
@@ -316,29 +338,92 @@ ach_effect <- ach_h2_out %>%
 
 ach_effect /ach_dist
 
-# Model for marginal effects
-# H2 <- svyglm(DROPOUT ~ INDIG*COHORT+STATE2+GENDER+GRADE+GEO+ACH1PV+ESCS+FLAG_MISS,design = lsay,family = quasibinomial())
-# ggeffects::ggpredict(H2, terms = c("COHORT","INDIG"))
 
 # Hypothesis 3: Heterogenity in Indigenous Effect ###
 
 #H3b: Is Indigenous gap the same for high/low SES
-svyPVglm(DROPOUT ~ INDIG*ESCS+COHORT+STATE2+GENDER+GRADE+GEO+ACH..PV+FLAG_MISS,design = lsay,family = quasibinomial(), placeholder = 1:5)
+H2_b <- svyPVglm(DROPOUT ~ INDIG*ESCS+COHORT+GENDER+GRADE+GEO+ACH..PV+FLAG_MISS,design = lsay,family = quasibinomial(), placeholder = 1:5)
+H2b_out <- H2_b$coef %>% 
+  rownames_to_column(var = "Parameter") %>%
+  as_tibble() %>%
+  mutate(conf.low = mean - 2*se,
+         conf.high = mean + 2*se)
 #H3c: Is Indigenous gap the same for urban/Rural
-svyPVglm(DROPOUT ~ INDIG*GEO+COHORT+ESCS+STATE2+GENDER+GRADE+GEO+ACH..PV+FLAG_MISS,design = lsay,family = quasibinomial(), placeholder = 1:5)
+H2_c <- svyPVglm(DROPOUT ~ INDIG*GEO+COHORT+ESCS+GENDER+GRADE+GEO+ACH..PV+FLAG_MISS,design = lsay,family = quasibinomial(), placeholder = 1:5)
+H2c_out <- H2_c$coef %>% 
+  rownames_to_column(var = "Parameter") %>%
+  as_tibble() %>%
+  mutate(conf.low = mean - 2*se,
+         conf.high = mean + 2*se)
 #H3d:Is Indigenous gap the same for boys/girls
-svyPVglm(DROPOUT ~ INDIG*GENDER+COHORT+ESCS+STATE2+GENDER+GRADE+GEO+ACH..PV+FLAG_MISS,design = lsay,family = quasibinomial(), placeholder = 1:5)
+H2_d <- svyPVglm(DROPOUT ~ INDIG*GENDER+COHORT+ESCS+GENDER+GRADE+GEO+ACH..PV+FLAG_MISS,design = lsay,family = quasibinomial(), placeholder = 1:5)
+H2d_out <- H2_d$coef %>% 
+  rownames_to_column(var = "Parameter") %>%
+  as_tibble() %>%
+  mutate(conf.low = mean - 2*se,
+         conf.high = mean + 2*se)
 # H3a: Is Indigenous gap the same for high/low achieving Indigenous kids
-svyPVglm(DROPOUT ~ INDIG*ACH..PV+COHORT+ESCS+STATE2+GENDER+GRADE+GEO+FLAG_MISS,design = lsay,family = quasibinomial(), placeholder = 1:5)
+H2_e <- svyPVglm(DROPOUT ~ INDIG*ACH..PV+COHORT+ESCS+GENDER+GRADE+GEO+FLAG_MISS,design = lsay,family = quasibinomial(), placeholder = 1:5)
+H2e_out <- H2_e$coef %>% 
+  rownames_to_column(var = "Parameter") %>%
+  as_tibble() %>%
+  mutate(conf.low = mean - 2*se,
+         conf.high = mean + 2*se)
 #H3f:Does the Indigenous gap respond to changes in legislation
-svyPVglm(DROPOUT ~ INDIG*COHORT+SC+GENDER+ESCS+STATE2+GENDER+GRADE+GEO+ACH..PV+FLAG_MISS,design = lsay,family = quasibinomial(), placeholder = 1:5)
-
+H2_f <- svyPVglm(DROPOUT ~ INDIG*COHORT+GENDER+ESCS+GENDER+GRADE+GEO+ACH..PV+FLAG_MISS,design = lsay,family = quasibinomial(), placeholder = 1:5)
+H2f_out <- H2_f$coef %>% 
+  rownames_to_column(var = "Parameter") %>%
+  as_tibble() %>%
+  mutate(conf.low = mean - 2*se,
+         conf.high = mean + 2*se)
 # All 2-way interaction
-svyPVglm(DROPOUT ~ INDIG*ACH..PV+INDIG*ESCS+INDIG*GEO+INDIG*COHORT+INDIG*GENDER+ESCS+COHORT+STATE2+GENDER+GRADE+GEO+FLAG_MISS,design = lsay,family = quasibinomial(), placeholder = 1:5)
+H2_g <- svyPVglm(DROPOUT ~ INDIG*ACH..PV+INDIG*ESCS+INDIG*GEO+INDIG*COHORT+INDIG*GENDER+ESCS+COHORT+GENDER+GRADE+GEO+FLAG_MISS,design = lsay,family = quasibinomial(), placeholder = 1:5)
+H2g_out <- H2_g$coef %>% 
+  rownames_to_column(var = "Parameter") %>%
+  as_tibble() %>%
+  mutate(conf.low = mean - 2*se,
+         conf.high = mean + 2*se)
 
+hypothesis_2 <- matrix(NA, ncol=3, nrow=6)
+hypothesis_2[1,] <- c("Main Indigenous effect", sprintf("%.2f [%.2f, %.2f] p = %.3f", H2_out$mean[2],H2_out$conf.low[2],H2_out$conf.high[2],H2_out$Pr.t[2] %>% as.numeric())," ")
+hypothesis_2[2,] <- c("Indigenous by gender", sprintf("%.2f [%.2f, %.2f] p = %.3f", H2d_out$mean[10],H2d_out$conf.low[10],H2d_out$conf.high[10],H2d_out$Pr.t[10]%>% as.numeric()),
+                      sprintf("%.2f [%.2f, %.2f] p = %.3f", H2g_out$mean[14],H2g_out$conf.low[14],H2g_out$conf.high[14],H2g_out$Pr.t[14]%>% as.numeric()) )
+
+hypothesis_2[3,] <- c("Indigenous by urban",sprintf("%.2f [%.2f, %.2f] p = %.3f", H2c_out$mean[10],H2c_out$conf.low[10],H2c_out$conf.high[10],H2c_out$Pr.t[10]%>% as.numeric()),
+                      sprintf("%.2f [%.2f, %.2f] p = %.3f", H2g_out$mean[12],H2g_out$conf.low[12],H2g_out$conf.high[12],H2g_out$Pr.t[12]%>% as.numeric()))
+
+hypothesis_2[4,] <- c("Indigenous by socioeconomic status",sprintf("%.2f [%.2f, %.2f] p = %.3f", H2b_out$mean[10],H2b_out$conf.low[10],H2b_out$conf.high[10],H2b_out$Pr.t[10]%>% as.numeric()),
+                      sprintf("%.2f [%.2f, %.2f] p = %.3f", H2g_out$mean[11],H2g_out$conf.low[11],H2g_out$conf.high[11],H2g_out$Pr.t[11]%>% as.numeric()))
+
+hypothesis_2[5,] <- c("Indigenous by cohort",sprintf("%.2f [%.2f, %.2f] p = %.3f", H2f_out$mean[10],H2f_out$conf.low[10],H2f_out$conf.high[10],H2f_out$Pr.t[10]%>% as.numeric()),
+                      sprintf("%.2f [%.2f, %.2f] p = %.3f", H2g_out$mean[13],H2g_out$conf.low[13],H2g_out$conf.high[13],H2g_out$Pr.t[13]%>% as.numeric()))
+
+hypothesis_2[6,] <- c("Indigenous by achievement",sprintf("%.2f [%.2f, %.2f] p = %.3f", H2e_out$mean[10],H2e_out$conf.low[10],H2e_out$conf.high[10],H2e_out$Pr.t[10]%>% as.numeric()),
+                      sprintf("%.2f [%.2f, %.2f] p = %.3f", H2g_out$mean[10],H2g_out$conf.low[10],H2g_out$conf.high[10],H2g_out$Pr.t[10]%>% as.numeric()))
+
+hypothesis_2 <- data.frame(hypothesis_2)
+names(hypothesis_2) <- c("Log-odds", "Univariate", "Multivariate")
+
+flextable(hypothesis_2) %>%
+  hline_bottom(x=.,part="header", border = fp_border(width=1)) %>%
+  hline_top(x=.,part="header", border = fp_border(width=2)) %>%
+  autofit() %>%
+  align(align = "left", part = "all") %>%
+  footnote(i = 1, j = 2:3, part = "header",
+           value = as_paragraph(c("Interaction when entered one at a time",
+                                  "Interactions when all interactions entered into the model")
+           ),
+           ref_symbols = c("a", "b")) %>%
+  color(i = c(1:2,5),
+        j = 2,
+        color="grey") %>%
+  color(i = c(2,5),
+        j = 3,
+        color="dark grey") %>%
+  set_caption("Table 3. Hypothesis 2 Results") %>%
+  save_as_image(path = "img/hypothesis2.png")
 
 # To get Marginal Effects
-
 
 H3a <- svyglm(DROPOUT ~ INDIG*ESCS+COHORT+STATE2+GENDER+GRADE+GEO+ACH1PV+SC+FLAG_MISS,design = lsay,family = quasibinomial())
 ses_h3 <- ggeffects::ggpredict(H3a, terms = c("INDIG", "ESCS [-2,-1.9,-1.8,-1.7,-1.6,-1.5,-1.4,-1.3,-1.2,-1.1,-1,-0.9,-0.8,-0.7,-0.6,-0.5,-0.4,-0.3,-0.2,-0.1,0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2]"))
