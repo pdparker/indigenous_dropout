@@ -30,18 +30,20 @@ library(sparkline)
 # Change here
 lsay2009<- readit::readit("~/cloudstor/Databases/2020-03-12_LSAY/LSAY_2009.dta")
 lsay2003<- readit::readit("~/cloudstor/Databases/LSAY_DATSETS/LSAY2003_2016.sav")
+lsay2015<- readit::readit("~/cloudstor/Databases/2020-03-12_LSAY/LSAY_2015.dta")
+
 meta <- read_csv("names_metadata.csv")
 
-sjlabelled::get_labels(lsay2003$sex)
-sjlabelled::get_labels(lsay2009$ST04Q01)
+#sjlabelled::get_labels(lsay2003$sex)
+#sjlabelled::get_labels(lsay2009$ST04Q01)
 # 2003 
 lsay2003short <- lsay2003 %>%
   setNames(toupper(names(.)))%>%
   filter(!is.na(WT2004) ) %>% #Not sure wether to use 2004 weights or 2007
   select(WT2 = WT2007, starts_with("PV"), INDIG, GENDER = SEX, GEO = LOC,
-         SCH10 = LBWDV01, SCH11 = LCWDV01, SCH12 = LDWDV01, SCH13 = LEWDV01,
+         SCH10 = LBWDV01, SCH11 = LCWDV01, SCH12 = LDWDV01, 
          STATEID, GRADE = ST01Q01,
-         SC = LAA027, WT = WT2004, ESCS, starts_with("W_FSTR")) %>%
+         WT = WT2004, ESCS, starts_with("W_FSTR")) %>%
   mutate(ESCS = replace(ESCS, ESCS > 900, NA),
          INDIG = replace(INDIG, INDIG == 8,NA),
          GRADE = replace(GRADE, GRADE > 90, NA),
@@ -53,11 +55,9 @@ lsay2003short <- lsay2003 %>%
            SCH10 == 1 ~ 1,
            SCH11 == 1 ~ 1,
            SCH12 == 1 ~ 1,
-           SCH13 == 1 ~ 1,
            SCH10 != 1 ~ 0,
            SCH11 != 1 ~ 0,
            SCH12 != 1 ~ 0,
-           SCH13 != 1 ~ 0,
            TRUE ~ NA_real_
          ),
          GEO = case_when(
@@ -76,9 +76,9 @@ lsay2003short <- lsay2003 %>%
 lsay2009short <-lsay2009 %>% 
   filter(!is.na(WT2010)) %>% #Not sure wether to use 2010 weights or 2013
   select(WT2 = WT2013,starts_with("PV"), INDIG, GENDER = ST04Q01, 
-         SCH10 = LBWDV01, SCH11 = LCWDV01, SCH12 = LDWDV01, SCH13 = LEWDV01,
+         SCH10 = LBWDV01, SCH11 = LCWDV01, SCH12 = LDWDV01, 
          STATEID = STATE, GRADE = ST01Q01, GEO = GEOLOC,
-         SC = ST62N04, WT = WT2010, ESCS, starts_with("W_FSTR")) %>%
+         WT = WT2010, ESCS, starts_with("W_FSTR")) %>%
   select(-matches("READ[1-9]+")) %>%
   mutate(ESCS = replace(ESCS, ESCS > 900, NA),
          INDIG = replace(INDIG, INDIG == 8,NA),
@@ -93,11 +93,9 @@ lsay2009short <-lsay2009 %>%
            SCH10 == 1 ~ 1,
            SCH11 == 1 ~ 1,
            SCH12 == 1 ~ 1,
-           SCH13 == 1 ~ 1,
            SCH10 != 1 ~ 0,
            SCH11 != 1 ~ 0,
            SCH12 != 1 ~ 0,
-           SCH13 != 1 ~ 0,
            TRUE ~ NA_real_
          ),
          GEO = case_when(
@@ -112,6 +110,48 @@ lsay2009short <-lsay2009 %>%
   ) %>%
   as_survey_rep(type = "Fay", rho = .05, repweights = starts_with("W_FSTR"), weights = WT)
 
+#LSAY 2015
+lsay2015short <- lsay2015 %>%
+  setNames(toupper(names(.)))%>%
+  filter(!is.na(WT16GENP) ) %>% #Not sure wether to use 2004 weights or 2007
+  select(WT2 = WT18GENP,starts_with("PV"), INDIG, GENDER = ST004Q01TA, 
+         SCH10 = LBLA003, SCH11 = LCWDV01, SCH12 = LDWDV01,
+         STATEID = STATE, GRADE = GRADE, GEO = GEOLOC_3,
+         WT = WT16GENP, ESCS, starts_with("W_FSTURWT") ) %>%
+  select(-matches("READ[1-9]+")) %>%
+  mutate(
+         INDIG = replace(INDIG, INDIG == 9,NA) %>% as.numeric(),
+         GRADE = replace(GRADE, GRADE > 90, NA),
+         GENDER = case_when(
+           GENDER == 2 ~ 1, #1 is male
+           GENDER == 1 ~ 0, #0 is female
+           TRUE ~ NA_real_
+         ),
+         DROPOUT = case_when(
+           SCH10 == 2 ~ 1,
+           SCH11 == 1 ~ 1,
+           SCH12 == 1 ~ 1,
+           SCH10 != 2 ~ 0,
+           SCH11 != 1 ~ 0,
+           SCH12 != 1 ~ 0,
+           SCH10 == 98 ~ NA_real_,
+           TRUE ~ NA_real_
+         ),
+         GEO = case_when(
+           GEO == 1 ~ 1, # 1 is Urban
+           TRUE ~ 0 # 0 is Rural
+         ),
+         ACH1PV = principal(.[,c("PV1READ","PV1SCIE","PV1MATH")],nfactors = 1)$scores,
+         ACH2PV = principal(.[,c("PV2READ","PV2SCIE","PV2MATH")],nfactors = 1)$scores,
+         ACH3PV = principal(.[,c("PV3READ","PV3SCIE","PV3MATH")],nfactors = 1)$scores,
+         ACH4PV = principal(.[,c("PV4READ","PV4SCIE","PV4MATH")],nfactors = 1)$scores,
+         ACH5PV = principal(.[,c("PV5READ","PV5SCIE","PV5MATH")],nfactors = 1)$scores
+  ) 
+  
+names(lsay2015short)[122:201] <- paste0("W_FSTR", 1:80)
+
+lsay2015short<- lsay2015short%>%
+  as_survey_rep(type = "Fay", rho = .05, repweights = starts_with("W_FSTR"), weights = WT)
 
 #Combined Cohorts ####
 #Z-score function as the scale function does not work with the survey package for some reasons
@@ -119,17 +159,21 @@ z <- function(z) {(z-mean(z, na.rm=TRUE))/sd(z, na.rm=TRUE)}
 # Combine the cohorts
 # #Warnings relate to survey not liking labelled data. These can be safely ignored
 lsay <- bind_rows(lsay2003short$variables, lsay2009short$variables,.id = "COHORT") %>%
+  bind_rows(., lsay2015short$variables, .id = "COHORT2")%>%
   mutate(STATEID = factor(STATEID),
-         SC = z(SC)*-1,
          STATE2 = case_when(
            STATEID %in% 1:3 ~ 1,
            TRUE ~ 0
          ),
          FLAG_MISS = ifelse(is.na(WT2), 1,0),
-         DROPOUT_10 = ifelse(SCH10 == 1, 1,0)
+         COHORT = case_when(
+           COHORT2 == 2 ~ "C2015",
+           COHORT == 2 ~ "C2009",
+           TRUE ~ "C2003"
+         )
          )
 
-table(lsay$DROPOUT, useNA = "always")
+table(lsay$DROPOUT, lsay$COHORT, useNA = "always") %>% prop.table(margin=1)
 table(lsay$GENDER, lsay$COHORT, useNA = "always")
 table(lsay$INDIG, lsay$COHORT, useNA = "always")
 lsay %>% select(-starts_with("PV"), -starts_with("W_")) %>% summary
@@ -176,17 +220,17 @@ flextable(descriptive) %>%
 # H1a: Indigenous Australian Children have higher dropout rates
 H1 <- svyglm(DROPOUT ~ INDIG+COHORT+GRADE+GEO+GENDER+FLAG_MISS+ESCS,design = lsay,family = quasibinomial())
 # Tidy Output
-H1_out <- tidy(H1, conf.int=TRUE)
+(H1_out <- tidy(H1, conf.int=TRUE))
 #Marginal Effects H1b
 ggeffects::ggpredict(H1, terms = c("INDIG"))
 # Is the gap the same for boys and girls
 H1b <- svyglm(DROPOUT ~ INDIG*GENDER+COHORT+GRADE+GEO+GENDER+FLAG_MISS+ESCS,design = lsay,family = quasibinomial())
 # Tidy Output
-H1b_out <- tidy(H1b, conf.int=TRUE)
+(H1b_out <- tidy(H1b, conf.int=TRUE) )
 # Is the gap the same for urban and rural
 H1c <- svyglm(DROPOUT ~ INDIG*GEO+COHORT+GRADE+GEO+GENDER+FLAG_MISS+ESCS,design = lsay,family = quasibinomial())
 # Tidy Output
-H1c_out <- tidy(H1c, conf.int=TRUE)
+(H1c_out <- tidy(H1c, conf.int=TRUE))
 #Marginal Effects H1b
 geo_h1 <- ggeffects::ggpredict(H1b, terms = c("INDIG","GEO"))
 
@@ -206,7 +250,7 @@ geo_plot <- geo_h1_out %>%
 # Is the gap the same for Rich and poor and rural
 H1d <- svyglm(DROPOUT ~ INDIG*ESCS+COHORT+GRADE+GEO+GENDER+FLAG_MISS+ESCS,design = lsay,family = quasibinomial())
 # Tidy Output
-H1d_out <- tidy(H1d, conf.int=TRUE)
+(H1d_out <- tidy(H1d, conf.int=TRUE))
 ses_h1 <- ggeffects::ggpredict(H1d, terms = c("INDIG","ESCS [-2,-1,0,1,2]"))
 ses_h1_out <- data.frame(prob = ses_h1$predicted, ci.low = ses_h1$conf.low, ci.high = ses_h1$conf.high,
                          indig = rep(c("non-Indigenous","Indigenous"),each=5), ses = rep(-2:2, 2))
@@ -250,7 +294,7 @@ H1e_out <- tidy(H1e, conf.int=TRUE)
 # Has the gap closed
 H1f <- svyglm(DROPOUT ~ INDIG*COHORT+ESCS+COHORT+GRADE+GEO+GENDER+FLAG_MISS+ESCS,design = lsay,family = quasibinomial())
 # Tidy Output
-H1f_out <- tidy(H1f, conf.int=TRUE)
+(H1f_out <- tidy(H1f, conf.int=TRUE))
 
 hypothesis_1 <- matrix(NA, ncol=3, nrow=5)
 
